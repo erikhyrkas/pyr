@@ -10,7 +10,7 @@ Use Pyr at your own risk.
 
 ## Goals
 
-Many use cases require instruction following and speed, but require encyclopedic knowledge.
+Many use cases require instruction following and speed, but do not require encyclopedic knowledge.
 
 ### Pyr Tokenizer (trained)
 
