@@ -1,0 +1,2 @@
+{% for m in messages %}<|im_start|>{{ m['role'] }}
+{{ m['content'] }}<|im_end|>{% endfor %}<|im_start|>assistant
