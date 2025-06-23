@@ -12,7 +12,7 @@ Use Pyr at your own risk.
 
 Many use cases require instruction following and speed, but require encyclopedic knowledge.
 
-### Pyr Tokenizer (in progress)
+### Pyr Tokenizer (trained)
 
 - Compact (16k english vocab)
 - Feature focused
