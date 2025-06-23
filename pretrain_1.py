@@ -20,7 +20,7 @@ def main():
     print("=" * 70)
 
     DATASET_SIZE = 20_000_000  # 20M samples = ~10B tokens for length 512 (this data set has about 39b possible tokens)
-    EPOCS = 2
+    EPOCHS = 2
     MAX_LENGTH = 512  # Sequence length for training
     MAX_POSITION_EMBEDDINGS = 8_192  # Maximum sequence length model can handle
 
@@ -107,17 +107,11 @@ def main():
     print(f"   Gradient accumulation: {grad_accum}")
     print(f"   Effective batch size: {effective_batch_size}")
 
-    # In the interest of time to train, I'm only using 5 billion training tokens, which might be enough.
-    # The paper this is based on uses A LOT more tokens for there 110 million parameter version. We have
-    # more tokens available in our dataset, but if 5 billion is terrible, using 3 epochs might still
-    # be good enough -- though, realistically, I think just taking 15 billion or 20 billion from the
-    # original dataset would have been better. I just know that that's a month of training, and I'm
-    # maybe being a little optimistic that I can stop at 5 billion.
     training_args = TrainingArguments(
         output_dir=output_dir,
         per_device_train_batch_size=batch_size,
         gradient_accumulation_steps=grad_accum,
-        num_train_epochs=EPOCS,
+        num_train_epochs=EPOCHS,
         save_total_limit=3,
         logging_steps=100,
         save_steps=1000,
@@ -152,7 +146,7 @@ def main():
         data_collator=data_collator,
     )
 
-    total_steps = len(tokenized["train"]) // effective_batch_size * 3  # 3 epochs
+    total_steps = len(tokenized["train"]) // effective_batch_size * EPOCHS
     print(f"   Total training steps: {total_steps:,}")
     print(f"   Estimated training time: {total_steps * 1.5 / 60:.1f} minutes")
 
