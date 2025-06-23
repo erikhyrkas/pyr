@@ -50,20 +50,20 @@ Many use cases require instruction following and speed, but do not require encyc
 
 ## Training Plan
 
-Pyr-base-135m:
+### Pyr-base-135m
 
 - Phase 1 (Cosmopedia-v2, 10B tokens @ 512 seq len) 
 - Phase 2 (FineWeb-EDU, 10B tokens @ 1024 seq len)
 - Phase 3 (Python-EDU corpus)
 
-Pyr-instruct-135m:
+### Pyr-instruct-135m
 
 - SFT: smol-smoltalk  (484k rows/maybe 2b tokens)
 
-Aspirational:
+### Pyr-135m-reasoning (aspirational)
 
 - SFT: reasoning-v1-20m (up to 22m rows/35b tokens, would likely take a sample)
-- DPO/SFT: smoltalk (this is much bigger than smol-smoltalk...no that's not a typo or redudant.)
+- DPO/SFT: smoltalk (this is much bigger than smol-smoltalk...no that's not a typo or redundant.)
 
 ---
 
