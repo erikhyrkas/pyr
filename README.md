@@ -54,16 +54,16 @@ Many use cases require instruction following and speed, but do not require encyc
 
 - Phase 1 (Cosmopedia-v2, 10B tokens @ 512 seq len) 
 - Phase 2 (FineWeb-EDU, 10B tokens @ 1024 seq len)
-- Phase 3 (Python-EDU corpus)
+- Phase 3 (Python-EDU corpus, 7B tokens @ 1024 seq len )
 
 ### Pyr-instruct-135m
 
-- SFT: smol-smoltalk  (484k rows/maybe 2b tokens)
+- SFT (smol-smoltalk, 2b tokens @ 8192 seq len)
 
 ### Pyr-135m-reasoning (aspirational)
 
-- SFT: reasoning-v1-20m (up to 22m rows/35b tokens, would likely take a sample)
-- DPO/SFT: smoltalk (this is much bigger than smol-smoltalk...no that's not a typo or redundant.)
+- SFT (reasoning-v1-20m, 35b tokens @ 8192 seq len)
+- DPO/SFT (smoltalk, 8b tokens @ 8192 seq len)
 
 ---
 
