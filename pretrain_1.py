@@ -30,9 +30,6 @@ def main():
 
     print("\nLoading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained("./pyr-16k-tokenizer", use_fast=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     print(f"Tokenizer loaded: vocab_size={tokenizer.vocab_size}")
 
@@ -65,7 +62,8 @@ def main():
 
     print(f"\nLoading dataset ({DATASET_SIZE:,} samples)...")
     raw = load_dataset("HuggingFaceTB/smollm-corpus", "cosmopedia-v2")
-    split = raw["train"].select(range(DATASET_SIZE)).train_test_split(test_size=0.01, seed=42)
+    train = raw["train"].shuffle(seed=42)
+    split = train.select(range(DATASET_SIZE)).train_test_split(test_size=0.01, seed=42)
 
     print(f"Dataset loaded:")
     print(f"   Train: {len(split['train']):,} samples")
@@ -120,7 +118,7 @@ def main():
         learning_rate=1e-4,
         weight_decay=0.01,
         warmup_steps=500,
-        fp16=True,
+        bf16=True,
         max_grad_norm=1.0,
         logging_dir="./logs",
         dataloader_num_workers=0,

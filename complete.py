@@ -32,7 +32,6 @@ if not os.path.exists(f"{MODEL_DIR}/config.json"):
         exit(1)
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, use_fast=True)
-tokenizer.pad_token = tokenizer.eos_token
 
 model = AutoModelForCausalLM.from_pretrained(MODEL_DIR).to("cuda" if torch.cuda.is_available() else "cpu")
 model.eval()

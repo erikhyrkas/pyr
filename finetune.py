@@ -91,9 +91,6 @@ def main():
     # Load tokenizer
     print("\nLoading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_PATH, use_fast=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     # Set padding side to left for generation tasks
     tokenizer.padding_side = "left"
@@ -106,7 +103,7 @@ def main():
     print(f"\nLoading Pyr model from {BASE_MODEL_PATH}...")
     model = BitNetForCausalLM.from_pretrained(
         BASE_MODEL_PATH,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
         device_map="auto"
     )
 
@@ -129,7 +126,8 @@ def main():
     print(f"Using conversations: {samples_to_use:,}")
 
     if samples_to_use < total_available:
-        dataset = raw_dataset["train"].select(range(samples_to_use))
+        train = raw_dataset["train"].shuffle(seed=42)
+        dataset = train.select(range(samples_to_use))
     else:
         dataset = raw_dataset["train"]
 
@@ -206,7 +204,7 @@ def main():
         learning_rate=2e-5,  # Lower learning rate for instruction tuning
         weight_decay=0.01,
         warmup_steps=100,
-        fp16=True,
+        bf16=True,
         max_grad_norm=1.0,
         logging_dir="./logs-instruct",
         dataloader_num_workers=0,
@@ -217,8 +215,8 @@ def main():
         greater_is_better=False,
         save_safetensors=True,
         lr_scheduler_type="cosine",
-        gradient_checkpointing=True,  # Save memory
-        dataloader_pin_memory=True,
+        # gradient_checkpointing=True,  # Save memory at the cost of speed. wait and see if we need this.
+        # dataloader_pin_memory=True, # wait to see if we need this
         group_by_length=True,  # Group similar lengths together for efficiency
     )
 

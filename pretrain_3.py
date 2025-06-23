@@ -34,16 +34,13 @@ def main():
 
     print("\nLoading tokenizer from Phase 2...")
     tokenizer = AutoTokenizer.from_pretrained(PHASE2_MODEL_PATH, use_fast=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     print(f"Tokenizer loaded: vocab_size={tokenizer.vocab_size}")
 
     print(f"\nLoading Pyr model from Phase 2...")
     model = BitNetForCausalLM.from_pretrained(
         PHASE2_MODEL_PATH,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
         device_map="auto"
     )
 
@@ -64,7 +61,8 @@ def main():
     print(f"Available samples: {total_available:,}")
     print(f"Using samples: {samples_to_use:,}")
 
-    selected_data = raw["train"].select(range(samples_to_use))
+    train = raw["train"].shuffle(seed=42)
+    selected_data = train.select(range(samples_to_use))
     split = selected_data.train_test_split(test_size=0.005, seed=42)  # Smaller eval set (0.5%)
 
     print(f"Dataset loaded:")
@@ -121,7 +119,7 @@ def main():
         learning_rate=2e-5,  # Lower LR for specialized Python training
         weight_decay=0.01,
         warmup_steps=500,  # More warmup for large dataset
-        fp16=True,
+        bf16=True,
         max_grad_norm=1.0,
         logging_dir="./logs-phase3",
         dataloader_num_workers=0,
@@ -133,8 +131,8 @@ def main():
         save_safetensors=True,
         lr_scheduler_type="cosine",
         # Additional settings for large dataset
-        dataloader_pin_memory=True,
-        gradient_checkpointing=True,  # Save memory with large dataset
+        # dataloader_pin_memory=True, # wait to see if we need this
+        # gradient_checkpointing=True,  # Save memory at the cost of speed. wait and see if we need this.
     )
 
     data_collator = DataCollatorForLanguageModeling(

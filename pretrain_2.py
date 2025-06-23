@@ -30,16 +30,13 @@ def main():
 
     print("\nLoading tokenizer from Phase 1...")
     tokenizer = AutoTokenizer.from_pretrained(PHASE1_MODEL_PATH, use_fast=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     print(f"Tokenizer loaded: vocab_size={tokenizer.vocab_size}")
 
     print(f"\nLoading Pyr model from Phase 1...")
     model = BitNetForCausalLM.from_pretrained(
         PHASE1_MODEL_PATH,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
         device_map="auto"
     )
 
@@ -55,7 +52,8 @@ def main():
     raw = load_dataset("HuggingFaceFW/fineweb-edu", "sample-10BT")
 
     # Take a subset and split for training
-    selected_data = raw["train"].select(range(min(DATASET_SIZE, len(raw["train"]))))
+    train = raw["train"].shuffle(seed=42)
+    selected_data = train.select(range(min(DATASET_SIZE, len(train))))
     split = selected_data.train_test_split(test_size=0.01, seed=42)
 
     print(f"Dataset loaded:")
@@ -112,7 +110,7 @@ def main():
         learning_rate=5e-5,  # Lower LR for continued training
         weight_decay=0.01,
         warmup_steps=250,  # Fewer warmup steps since continuing training
-        fp16=True,
+        bf16=True,
         max_grad_norm=1.0,
         logging_dir="./logs-phase2",
         dataloader_num_workers=0,
