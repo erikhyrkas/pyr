@@ -1,3 +1,4 @@
+import gc
 import os
 import torch
 from datasets import load_dataset
@@ -60,36 +61,10 @@ def main():
     model = model.to("cuda")
     print("Model moved to GPU")
 
-    print(f"\nLoading dataset ({DATASET_SIZE:,} samples)...")
-    raw = load_dataset("HuggingFaceTB/smollm-corpus", "cosmopedia-v2")
-    train = raw["train"].shuffle(seed=42)
-    split = train.select(range(DATASET_SIZE)).train_test_split(test_size=0.01, seed=42)
-
-    print(f"Dataset loaded:")
-    print(f"   Train: {len(split['train']):,} samples")
-    print(f"   Eval: {len(split['test']):,} samples")
-
-    def tokenize(batch):
-        result = tokenizer(
-            batch["text"],
-            truncation=True,
-            max_length=MAX_LENGTH,
-            padding="max_length",
-            return_attention_mask=True,
-            return_tensors=None
-        )
-        return {
-            "input_ids": result["input_ids"],
-            "attention_mask": result["attention_mask"]
-        }
-
-    print("Tokenizing dataset...")
-    tokenized = split.map(
-        tokenize,
-        batched=True,
-        remove_columns=split["train"].column_names,
-        desc="Tokenizing"
-    )
+    tokenized = build_tokenized_dataset(tokenizer, DATASET_SIZE, MAX_LENGTH)
+    # force a gc. Otherwise, we'll be hanging out with over 100 gb of garbage,
+    # which makes my system slower to use for other purposes while training is running.
+    gc.collect()
 
     print("Dataset tokenized")
 
@@ -221,6 +196,40 @@ def main():
     print("\n" + "=" * 70)
     print("PYR PRETRAINING COMPLETE")
     print("=" * 70)
+
+
+def build_tokenized_dataset(tokenizer, DATASET_SIZE, MAX_LENGTH):
+    print(f"\nLoading dataset ({DATASET_SIZE:,} samples)...")
+    raw = load_dataset("HuggingFaceTB/smollm-corpus", "cosmopedia-v2")
+    train = raw["train"].shuffle(seed=42)
+    split = train.select(range(DATASET_SIZE)).train_test_split(test_size=0.01, seed=42)
+    print(f"Dataset loaded:")
+    print(f"   Train: {len(split['train']):,} samples")
+    print(f"   Eval: {len(split['test']):,} samples")
+
+    def tokenize(batch):
+        result = tokenizer(
+            batch["text"],
+            truncation=True,
+            max_length=MAX_LENGTH,
+            padding="max_length",
+            return_attention_mask=True,
+            return_tensors=None
+        )
+        return {
+            "input_ids": result["input_ids"],
+            "attention_mask": result["attention_mask"]
+        }
+
+    print("Tokenizing dataset...")
+    tokenized = split.map(
+        tokenize,
+        batched=True,
+        remove_columns=split["train"].column_names,
+        desc="Tokenizing",
+        num_proc=12
+    )
+    return tokenized
 
 
 if __name__ == "__main__":
