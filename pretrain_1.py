@@ -70,6 +70,7 @@ def main():
 
     output_dir = f"./pyr-135m-base-1"
 
+    # even though I have gpu memory for 32x8 here, it was slower by a full day of training time
     batch_size = 16
     grad_accum = 16
     # effective batch size = 256 (16x16)
