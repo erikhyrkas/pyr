@@ -1,5 +1,3 @@
-/pyr-135m-base-1/checkpoint-*
-/pyr-135m-base-2/checkpoint-*
-/pyr-135m-base-3/checkpoint-*
+/pyr-135m-base-*/checkpoint-*
 /.idea
 /.venv

@@ -1,6 +1,35 @@
 import os
-import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch, humanize, time
+
+
+def check_quantization_status(model, max_layers=5):
+    """Check quantization status of multiple layers"""
+    print("\nQuantization Status:")
+    layer_count = 0
+    for name, param in model.named_parameters():
+        if 'weight' in name and len(param.shape) > 1:
+            unique_vals = torch.unique(param.data.abs())
+            print(f"  {name}: {len(unique_vals)} unique absolute values")
+            if len(unique_vals) <= 10:
+                values = unique_vals.cpu().numpy()
+                print(f"    Values: {values}")
+            else:
+                print(f"    Range: [{unique_vals.min():.6f}, {unique_vals.max():.6f}]")
+
+            layer_count += 1
+            if layer_count >= max_layers:
+                break
+
+
+def gpu_mem(label=""):
+    torch.cuda.synchronize()
+    alloc = torch.cuda.memory_allocated()  # live tensors
+    reserved = torch.cuda.memory_reserved()  # allocator bucket
+    peak = torch.cuda.max_memory_allocated()  # since last reset
+    print(f"{label:<15}  alloc={humanize.naturalsize(alloc, binary=True):>9}  "
+          f"reserved={humanize.naturalsize(reserved, binary=True):>9}  "
+          f"peak={humanize.naturalsize(peak, binary=True):>9}")
 
 
 def list_checkpoints(path):
@@ -12,54 +41,75 @@ def list_checkpoints(path):
     return directories
 
 
-MODEL_DIR = "./pyr-135m-base-1"
+def main():
+    MODEL_DIR = "./pyr-135m-base-1"
 
-if not os.path.exists(f"{MODEL_DIR}/config.json"):
-    # get a list of directories in the path
-    checkpoints = list_checkpoints(MODEL_DIR)
-    checkpoint_to_use = None
-    step_count = -1
-    for entry in checkpoints:
-        steps = int(entry.split("-")[1])
-        if steps > step_count:
-            checkpoint_to_use = entry
-            step_count = steps
-    if checkpoint_to_use is not None:
-        print(f"Loading checkpoint: {checkpoint_to_use}")
-        MODEL_DIR = f"{MODEL_DIR}/{checkpoint_to_use}"
-    else:
-        print("No checkpoints found.")
-        exit(1)
+    if not os.path.exists(f"{MODEL_DIR}/config.json"):
+        checkpoints = list_checkpoints(MODEL_DIR)
+        checkpoint_to_use = None
+        step_count = -1
+        for entry in checkpoints:
+            steps = int(entry.split("-")[1])
+            if steps > step_count:
+                checkpoint_to_use = entry
+                step_count = steps
+        if checkpoint_to_use is not None:
+            print(f"Loading checkpoint: {checkpoint_to_use}")
+            MODEL_DIR = f"{MODEL_DIR}/{checkpoint_to_use}"
+        else:
+            print("No checkpoints found.")
+            return
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, use_fast=True)
+    print("Loading tokenizer and model...")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, use_fast=True)
+    model = AutoModelForCausalLM.from_pretrained(MODEL_DIR).to("cuda" if torch.cuda.is_available() else "cpu")
+    # if not model.config.use_cache:
+    #     print("switch to use cache")
+    #     model.config.use_cache = True
+    model.eval()
 
-model = AutoModelForCausalLM.from_pretrained(MODEL_DIR).to("cuda" if torch.cuda.is_available() else "cpu")
-model.eval()
+    print("\n" + "=" * 50)
+    print("BEFORE QUANTIZATION")
+    print("=" * 50)
+    gpu_mem("post-load")
+    check_quantization_status(model)
 
-print("Type text to complete Ctrl+C to exit.")
+    print(f"\n{'=' * 50}")
+    print("TESTING GENERATION")
+    print("=" * 50)
+    print("Type text to complete (Ctrl+C to exit)")
 
-try:
-    while True:
-        user_input = input("\nComplete: ")
+    try:
+        while True:
+            user_input = input("\nComplete: ")
 
-        inputs = tokenizer(user_input, return_tensors="pt").to(model.device)
+            inputs = tokenizer(user_input, return_tensors="pt").to(model.device)
+            generate_inputs = {k: v for k, v in inputs.items() if k != "token_type_ids"}
 
-        generate_inputs = {k: v for k, v in inputs.items() if k != "token_type_ids"}
+            start = time.time()
+            MAX_TOKENS = 512
+            with torch.no_grad():
+                outputs = model.generate(
+                    **generate_inputs,
+                    max_new_tokens=MAX_TOKENS,
+                    do_sample=False,
+                    # do_sample=True,
+                    # temperature=0.9,
+                    # top_k=40,
+                    # top_p=0.95,
+                    pad_token_id=tokenizer.eos_token_id,
+                )
+            response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+            end = time.time()
+            elapsed = end - start
+            print(f"Response: {response}")
+            generated_len = outputs[0].shape[0] - inputs["input_ids"].shape[1]
+            print(f"Tokens/sec: {generated_len / elapsed:.2f}")
+            gpu_mem("post-gen")
 
-        with torch.no_grad():
-            outputs = model.generate(
-                **generate_inputs,
-                max_new_tokens=512,
-                do_sample=True,
-                temperature=0.9,
-                top_k=40,
-                top_p=0.95,
-                pad_token_id=tokenizer.eos_token_id,
-            )
+    except KeyboardInterrupt:
+        print("\nGoodbye!")
 
-        # Extract response (skip prompt)
-        response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-        print(response)
 
-except KeyboardInterrupt:
-    print("\nGoodbye.")
+if __name__ == "__main__":
+    main()

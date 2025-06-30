@@ -1,6 +1,6 @@
 # Pyr 🔥
 
-Pyr is a small, fast, efficient, and useful language model built on a custom BitNet 1.58-style architecture with only **135 million parameters**. It’s trained from scratch using a compact tokenizer, high-quality data, and following a training sequencing strategy.
+Pyr is a small, fast, efficient, and useful language model built on a standard architecture with only **135 million parameters**. It’s trained from scratch using a compact tokenizer, high-quality data, and following a training sequencing strategy.
 
 This series of models is English only, which is unfortunate, but a compact tokenizer and limited training set is critical for the hardware I have and objectives of the model.
 
@@ -39,7 +39,7 @@ Many use cases require instruction following and speed, but do not require encyc
 
 ## Architecture
 
-- Based on [BitNet 1.58](https://arxiv.org/abs/2504.12285v2), simplified for compact deployment
+- A simple, standard model
 - 16 layers, 768 hidden size, 12 attention heads, GQA with 4 kv-heads
 - ReLU² activations, rotary position encoding
 - Trained using `transformers.Trainer` with mixed-precision and aggressive batching
