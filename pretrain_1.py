@@ -42,7 +42,6 @@ def main():
         num_key_value_heads=4,  # GQA
         intermediate_size=2304,  # 3x hidden_size
         max_position_embeddings=MAX_POSITION_EMBEDDINGS,
-        torch_dtype=torch.bfloat16,
         attention_dropout=0.0,
         hidden_dropout=0.0,
         rms_norm_eps=1e-5,
@@ -57,10 +56,6 @@ def main():
     total_params = sum(p.numel() for p in model.parameters()) / 1e6
     print(f"Pyr model created: {total_params:.1f}M parameters")
 
-    # Convert to bfloat16 for efficiency
-    model = model.to(torch.bfloat16).to("cuda")
-    print("Model moved to GPU with bfloat16")
-
     tokenized = build_tokenized_dataset(tokenizer, DATASET_SIZE, MAX_LENGTH)
     # force a gc. Otherwise, we'll be hanging out with over 100 gb of garbage,
     # which makes my system slower to use for other purposes while training is running.
@@ -71,10 +66,13 @@ def main():
     output_dir = f"./pyr-135m-base-1"
 
     # even though I have gpu memory for 32x8 here, it was slower by a full day of training time
-    batch_size = 32
+    batch_size = 16
     grad_accum = 16
     effective_batch_size = batch_size * grad_accum
 
+    # I feel like I should have tried (I've had good success with it on other models):
+    # lr_scheduler_type="cosine",
+    # there is something wrong with tensorboard logging
     training_args = TrainingArguments(
         output_dir=output_dir,
         per_device_train_batch_size=batch_size,
@@ -88,7 +86,7 @@ def main():
         learning_rate=1e-4,
         weight_decay=0.01,
         warmup_steps=500,
-        bf16=True,
+        bf16=True, # I'm skeptical this took effect.
         max_grad_norm=1.0,
         logging_dir=f"{output_dir}/logs",
         logging_first_step=True,

@@ -10,7 +10,7 @@ def check_quantization_status(model, max_layers=5):
     for name, param in model.named_parameters():
         if 'weight' in name and len(param.shape) > 1:
             unique_vals = torch.unique(param.data.abs())
-            print(f"  {name}: {len(unique_vals)} unique absolute values")
+            print(f"  {name}: {len(unique_vals):,} unique absolute values")
             if len(unique_vals) <= 10:
                 values = unique_vals.cpu().numpy()
                 print(f"    Values: {values}")
@@ -22,12 +22,12 @@ def check_quantization_status(model, max_layers=5):
                 break
 
 
-def gpu_mem(label=""):
+def gpu_mem():
     torch.cuda.synchronize()
     alloc = torch.cuda.memory_allocated()  # live tensors
     reserved = torch.cuda.memory_reserved()  # allocator bucket
     peak = torch.cuda.max_memory_allocated()  # since last reset
-    print(f"{label:<15}  alloc={humanize.naturalsize(alloc, binary=True):>9}  "
+    print(f"alloc={humanize.naturalsize(alloc, binary=True):>9}  "
           f"reserved={humanize.naturalsize(reserved, binary=True):>9}  "
           f"peak={humanize.naturalsize(peak, binary=True):>9}")
 
@@ -63,15 +63,10 @@ def main():
     print("Loading tokenizer and model...")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, use_fast=True)
     model = AutoModelForCausalLM.from_pretrained(MODEL_DIR).to("cuda" if torch.cuda.is_available() else "cpu")
-    # if not model.config.use_cache:
-    #     print("switch to use cache")
-    #     model.config.use_cache = True
+    print(f"model.config.use_cache = {model.config.use_cache}")
     model.eval()
 
-    print("\n" + "=" * 50)
-    print("BEFORE QUANTIZATION")
-    print("=" * 50)
-    gpu_mem("post-load")
+    gpu_mem()
     check_quantization_status(model)
 
     print(f"\n{'=' * 50}")
@@ -88,24 +83,25 @@ def main():
 
             start = time.time()
             MAX_TOKENS = 512
+            # sampling is helpful to see more sane outputs early in training
+            # eventually, the greedy decoding is faster and good enough.
             with torch.no_grad():
                 outputs = model.generate(
                     **generate_inputs,
                     max_new_tokens=MAX_TOKENS,
-                    do_sample=False,
-                    # do_sample=True,
-                    # temperature=0.9,
-                    # top_k=40,
-                    # top_p=0.95,
-                    pad_token_id=tokenizer.eos_token_id,
+                    # do_sample=False,
+                    do_sample=True,
+                    top_p=0.98,
+                    top_k=40,
+                    pad_token_id=tokenizer.pad_token_id,
                 )
             response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
             end = time.time()
             elapsed = end - start
             print(f"Response: {response}")
+            gpu_mem()
             generated_len = outputs[0].shape[0] - inputs["input_ids"].shape[1]
             print(f"Tokens/sec: {generated_len / elapsed:.2f}")
-            gpu_mem("post-gen")
 
     except KeyboardInterrupt:
         print("\nGoodbye!")
