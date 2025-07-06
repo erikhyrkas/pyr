@@ -1,78 +1,62 @@
 import os
 import torch
-from datasets import load_dataset
+import gc
+from datasets import load_from_disk
 from transformers import (
-    BitNetForCausalLM,
+    LlamaForCausalLM,
     AutoTokenizer,
     Trainer,
     TrainingArguments,
     DataCollatorForLanguageModeling
 )
 
+from prepare_clean_story_dataset import SAVE_PATH
+
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "true"
 
 
 def main():
     print("=" * 70)
-    print("PRETRAINING Phase 2")
+    print("PYR PRETRAINING Phase 2 - Narrative Fluency")
     print("=" * 70)
 
-    DATASET_SIZE = 10_000_000  # 10M samples = ~10B tokens for length 1024
-    EPOCHS = 1
-    MAX_LENGTH = 1024  # Increased sequence length for phase 2
-
-    # Path to Phase 1 model
+    DATASET_PATH = SAVE_PATH
     PHASE1_MODEL_PATH = "./pyr-135m-base-1"
+    OUTPUT_DIR = "./pyr-135m-base-2"
 
-    print(f"Dataset size: {DATASET_SIZE:,} samples")
-    print(f"Training sequence length: {MAX_LENGTH}")
-    print(f"Loading from Phase 1 model: {PHASE1_MODEL_PATH}")
+    EPOCHS = 1
+    MAX_LENGTH = 2048  # Sequence length for RoyalRoad training
 
-    print("\nLoading tokenizer from Phase 1...")
+    print(f"Loading tokenizer from Phase 1...")
     tokenizer = AutoTokenizer.from_pretrained(PHASE1_MODEL_PATH, use_fast=True)
 
-    print(f"Tokenizer loaded: vocab_size={tokenizer.vocab_size}")
-
-    print(f"\nLoading Pyr model from Phase 1...")
-    model = BitNetForCausalLM.from_pretrained(
+    print(f"Loading model from Phase 1...")
+    model = LlamaForCausalLM.from_pretrained(
         PHASE1_MODEL_PATH,
         torch_dtype=torch.bfloat16,
         device_map="auto"
     )
 
+    print(f"Model and tokenizer loaded.")
     total_params = sum(p.numel() for p in model.parameters()) / 1e6
-    print(f"Pyr model loaded: {total_params:.1f}M parameters")
+    print(f"Model parameters: {total_params:.1f}M")
 
-    # Ensure model is on GPU
-    if not next(model.parameters()).is_cuda:
-        model = model.to("cuda")
-        print("Model moved to GPU")
-
-    print(f"\nLoading FineWeb-EDU dataset ({DATASET_SIZE:,} samples)...")
-    raw = load_dataset("HuggingFaceFW/fineweb-edu", "sample-10BT")
-
-    # Take a subset and split for training
-    train = raw["train"].shuffle(seed=42)
-    selected_data = train.select(range(min(DATASET_SIZE, len(train))))
-    split = selected_data.train_test_split(test_size=0.01, seed=42)
+    print(f"\nLoading filtered RoyalRoad dataset from disk: {DATASET_PATH}")
+    dataset = load_from_disk(DATASET_PATH)
+    split = dataset.train_test_split(test_size=0.01, seed=42)
 
     print(f"Dataset loaded:")
     print(f"   Train: {len(split['train']):,} samples")
     print(f"   Eval: {len(split['test']):,} samples")
 
     def tokenize(batch):
-        result = tokenizer(
+        return tokenizer(
             batch["text"],
             truncation=True,
             max_length=MAX_LENGTH,
             padding="max_length",
-            return_attention_mask=True,
-            return_tensors=None
+            return_attention_mask=True
         )
-        return {
-            "input_ids": result["input_ids"],
-            "attention_mask": result["attention_mask"]
-        }
 
     print("Tokenizing dataset...")
     tokenized = split.map(
@@ -80,47 +64,39 @@ def main():
         batched=True,
         remove_columns=split["train"].column_names,
         desc="Tokenizing",
-        num_proc=4  # Parallel processing for faster tokenization
+        num_proc=4
     )
 
-    print("Dataset tokenized")
+    print("Dataset tokenized.")
+    gc.collect()
 
-    output_dir = f"./pyr-135m-base-2"
-
-    batch_size = 8  # Reduced due to longer sequences (1024 vs 512)
-    grad_accum = 32  # Increased to maintain similar effective batch size
+    batch_size = 4  # Memory-aware for 2048 seq len
+    grad_accum = 32
     effective_batch_size = batch_size * grad_accum
 
-    print(f"\nTraining configuration:")
-    print(f"   Batch size: {batch_size}")
-    print(f"   Gradient accumulation: {grad_accum}")
-    print(f"   Effective batch size: {effective_batch_size}")
-
-    # Lower learning rate for continued training
     training_args = TrainingArguments(
-        output_dir=output_dir,
+        output_dir=OUTPUT_DIR,
         per_device_train_batch_size=batch_size,
         gradient_accumulation_steps=grad_accum,
         num_train_epochs=EPOCHS,
-        save_total_limit=3,
+        save_total_limit=2,
         logging_steps=100,
         save_steps=1000,
         eval_strategy="steps",
         eval_steps=1000,
-        learning_rate=5e-5,  # Lower LR for continued training
+        learning_rate=5e-5,
         weight_decay=0.01,
-        warmup_steps=250,  # Fewer warmup steps since continuing training
+        warmup_steps=250,
         bf16=True,
         max_grad_norm=1.0,
-        logging_dir="./logs-phase2",
-        dataloader_num_workers=0,
+        logging_dir=f"{OUTPUT_DIR}/logs",
         remove_unused_columns=False,
         report_to=None,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         save_safetensors=True,
-        lr_scheduler_type="cosine",  # Cosine decay for phase 2
+        lr_scheduler_type="cosine",
     )
 
     data_collator = DataCollatorForLanguageModeling(
@@ -134,78 +110,35 @@ def main():
         args=training_args,
         train_dataset=tokenized["train"],
         eval_dataset=tokenized["test"],
-        data_collator=data_collator,
+        data_collator=data_collator
     )
 
-    total_steps = len(tokenized["train"]) // effective_batch_size * EPOCHS
-    print(f"   Total training steps: {total_steps:,}")
-    print(f"   Estimated training time: {total_steps * 2.5 / 60:.1f} minutes")  # Longer due to 1024 seq len
-
-    print("\nTesting forward pass with longer sequence...")
-    sample = tokenized["train"][0]
-    test_input = {
-        'input_ids': torch.tensor([sample['input_ids'][:512]]).to("cuda"),  # Test with 512 first
-        'attention_mask': torch.tensor([sample['attention_mask'][:512]]).to("cuda")
-    }
-
-    with torch.no_grad():
-        outputs = model(**test_input, labels=test_input['input_ids'])
-
-    print(f"Forward pass successful!")
-    print(f"   Current loss: {outputs.loss.item():.4f}")
-    print(f"   Output shape: {outputs.logits.shape}")
-
     print("\n" + "=" * 70)
-    print("STARTING PYR PHASE 2 PRETRAINING")
+    print("STARTING PYR PRETRAINING PHASE 2")
     print("=" * 70)
-    print("Press Ctrl+C to stop training and save current checkpoint")
 
     try:
         trainer.train()
 
-        print("\nPHASE 2 TRAINING COMPLETED SUCCESSFULLY!")
-        print("Saving final model...")
-        model.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
+        print("\nTRAINING COMPLETE!")
+        model.save_pretrained(OUTPUT_DIR)
+        tokenizer.save_pretrained(OUTPUT_DIR)
 
-        with open(f"{output_dir}/training_info.txt", "w") as f:
-            f.write(f"Pyr 135m Base - Phase 2\n")
+        with open(f"{OUTPUT_DIR}/training_info.txt", "w") as f:
+            f.write(f"Pyr 135m Base - Phase 2 (RoyalRoad filtered)\n")
             f.write(f"Parameters: {total_params:.1f}M\n")
             f.write(f"Training samples: {len(tokenized['train']):,}\n")
             f.write(f"Training sequence length: {MAX_LENGTH}\n")
-            f.write(f"Dataset: FineWeb-EDU\n")
             f.write(f"Effective batch size: {effective_batch_size}\n")
             f.write(f"Final eval loss: {trainer.state.log_history[-1].get('eval_loss', 'N/A')}\n")
             f.write(f"Continued from: {PHASE1_MODEL_PATH}\n")
-            f.write(f"Learning rate: {training_args.learning_rate}\n")
-            f.write(f"Architecture: BitNet with ReLU² activation\n")
 
-        print(f"Model saved to: {output_dir}")
-        print(f"Training info saved to: {output_dir}/training_info.txt")
-
-        print("\nTesting trained model...")
-        test_text = "Machine learning is a subset of artificial intelligence that"
-        inputs = tokenizer(test_text, return_tensors="pt").to("cuda")
-
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=50,
-                temperature=0.7,
-                do_sample=True,
-                pad_token_id=tokenizer.eos_token_id
-            )
-
-        generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print(f"Input: {test_text}")
-        print(f"Generated: {generated_text}")
+        print(f"Model saved to: {OUTPUT_DIR}")
 
     except KeyboardInterrupt:
-        print("\nTraining interrupted by user")
-        print("Saving current checkpoint...")
-        model.save_pretrained(f"{output_dir}-interrupted")
-        tokenizer.save_pretrained(f"{output_dir}-interrupted")
-        print(f"Checkpoint saved to: {output_dir}-interrupted")
+        print("\nTraining interrupted. Saving checkpoint...")
+        model.save_pretrained(f"{OUTPUT_DIR}-interrupted")
+        tokenizer.save_pretrained(f"{OUTPUT_DIR}-interrupted")
 
     except Exception as e:
         print(f"\nTraining failed: {e}")
@@ -213,7 +146,7 @@ def main():
         traceback.print_exc()
 
     print("\n" + "=" * 70)
-    print("PYR PHASE 2 PRETRAINING COMPLETE")
+    print("PHASE 2 PRETRAINING COMPLETE")
     print("=" * 70)
 
 

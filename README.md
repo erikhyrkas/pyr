@@ -52,9 +52,12 @@ Many use cases require instruction following and speed, but do not require encyc
 
 ### Pyr-base-135m
 
-- Phase 1 (Cosmopedia-v2, 10B tokens @ 512 seq len) 
-- Phase 2 (FineWeb-EDU, 10B tokens @ 1024 seq len)
-- Phase 3 (Python-EDU corpus, 7B tokens @ 1024 seq len )
+- Phase 1 (Cosmopedia-v2, 10B tokens @ 512 seq len)
+- Phase 2 (RoyalRoad-1.61M filtered, @ 2048 seq len)
+- Phase 3 (FineWeb-EDU, 10B tokens @ 1024 seq len)
+- Phase 4 (Python-EDU corpus, 7B tokens @ 1024 seq len )
+
+I noticed as phase 1 was winding down that the language was stilted, so I decided to do a round with a story-based dataset, but as there aren't many good ones and I didn't want to torrent books3, I decided to take a highly filtered version of Royal Road. The goal being to give the model a little more fluency before diving into facts. 
 
 ### Pyr-instruct-135m
 

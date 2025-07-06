@@ -1,3 +1,5 @@
 /pyr-135m-base-*/checkpoint-*
 /.idea
 /.venv
+/excluded_authors.txt
+/author_infraction_histogram.png
