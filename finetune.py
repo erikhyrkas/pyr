@@ -2,7 +2,7 @@ import os
 import torch
 from datasets import load_dataset
 from transformers import (
-    BitNetForCausalLM,
+    LlamaForCausalLM,
     AutoTokenizer,
     Trainer,
     TrainingArguments,
@@ -101,7 +101,7 @@ def main():
 
     # Load model
     print(f"\nLoading Pyr model from {BASE_MODEL_PATH}...")
-    model = BitNetForCausalLM.from_pretrained(
+    model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL_PATH,
         torch_dtype=torch.bfloat16,
         device_map="auto"

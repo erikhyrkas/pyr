@@ -20,7 +20,6 @@ def main():
     print("PYR PRETRAINING Phase 1")
     print("=" * 70)
 
-    # Same config as your BitNet version
     DATASET_SIZE = 20_000_000  # 20M samples = ~10B tokens for length 512 (this data set has about 39b possible tokens)
     EPOCHS = 2
     MAX_LENGTH = 512  # Sequence length for training

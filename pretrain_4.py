@@ -208,7 +208,7 @@ def main():
             f.write(f"Continued from: {PHASE3_MODEL_PATH}\n")
             f.write(f"Learning rate: {training_args.learning_rate}\n")
             f.write(f"Specialization: Python programming and education\n")
-            f.write(f"Architecture: BitNet with ReLU² activation\n")
+            f.write(f"Architecture: Llama with ReLU² activation\n")
 
         print(f"Model saved to: {output_dir}")
         print(f"Training info saved to: {output_dir}/training_info.txt")

@@ -53,7 +53,7 @@ Many use cases require instruction following and speed, but do not require encyc
 ### Pyr-base-135m
 
 - Phase 1 (Cosmopedia-v2, 10B tokens @ 512 seq len)
-- Phase 2 (RoyalRoad-1.61M filtered, @ 2048 seq len)
+- Phase 2 (RoyalRoad-1.61M filtered, 1B tokens @ 1024 seq len)
 - Phase 3 (FineWeb-EDU, 10B tokens @ 1024 seq len)
 - Phase 4 (Python-EDU corpus, 7B tokens @ 1024 seq len )
 

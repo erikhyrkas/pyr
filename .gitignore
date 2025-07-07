@@ -3,3 +3,4 @@
 /.venv
 /excluded_authors.txt
 /author_infraction_histogram.png
+/clean_royalroad_chunked
