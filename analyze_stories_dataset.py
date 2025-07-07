@@ -23,7 +23,7 @@ offensive_patterns = [
 compiled_patterns = [re.compile(p, re.IGNORECASE) for p in offensive_patterns]
 
 author_stats = defaultdict(lambda: {"total": 0, "bad": 0, "skipped": 0})
-
+MIN_VIEWS = 300
 for i, entry in enumerate(dataset):
     author = entry["author"]
     text = entry["text"]
@@ -31,7 +31,7 @@ for i, entry in enumerate(dataset):
     tags = entry.get("tags", [])
     warnings = entry.get("warnings", [])
     should_skip = False
-    if author is None or text is None or any(tag in EXCLUDE_GENRES for tag in tags) or any(warning in EXCLUDE_WARNINGS for warning in warnings) or average_views < 5000:
+    if author is None or text is None or any(tag in EXCLUDE_GENRES for tag in tags) or any(warning in EXCLUDE_WARNINGS for warning in warnings) or average_views < MIN_VIEWS:
         should_skip = True
     elif any(p.search(text) for p in compiled_patterns):
         author_stats[author]["bad"] += 1
@@ -64,7 +64,7 @@ plt.show()
 # Save flagged authors to file
 flagged_authors = [
     author for author, stats in author_stats.items()
-    if stats["bad"] >= 2 or (stats["total"] >= 3 and stats["bad"] / stats["total"] > 0.1)
+    if (stats["total"] < 3) or stats["bad"] >= 2 or (stats["total"] >= 3 and stats["bad"] / stats["total"] > 0.1)
 ]
 
 with open("excluded_authors.txt", "w", encoding="utf-8") as f:

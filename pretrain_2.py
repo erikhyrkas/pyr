@@ -84,9 +84,9 @@ def main():
         save_steps=1000,
         eval_strategy="steps",
         eval_steps=1000,
-        learning_rate=5e-5,
+        learning_rate=2e-5,  # Lower LR for stability after optimizer reset
         weight_decay=0.01,
-        warmup_steps=250,
+        warmup_steps=1000,   # Longer warmup for momentum rebuild
         bf16=True,
         max_grad_norm=1.0,
         logging_dir=f"{OUTPUT_DIR}/logs",
@@ -123,6 +123,7 @@ def main():
         print("\nTRAINING COMPLETE!")
         model.save_pretrained(OUTPUT_DIR)
         tokenizer.save_pretrained(OUTPUT_DIR)
+        trainer.save_state()  # Save optimizer/scheduler for phase 3
 
         with open(f"{OUTPUT_DIR}/training_info.txt", "w") as f:
             f.write(f"Pyr 135m Base - Phase 2 (RoyalRoad filtered)\n")

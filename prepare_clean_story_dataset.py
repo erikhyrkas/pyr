@@ -1,6 +1,8 @@
 from datasets import load_dataset, Dataset, DatasetDict
 from transformers import AutoTokenizer
 
+from analyze_stories_dataset import MIN_VIEWS
+
 tokenizer = AutoTokenizer.from_pretrained("./pyr-16k-tokenizer", use_fast=True)
 
 with open("excluded_authors.txt", "r", encoding="utf-8") as f:
@@ -27,7 +29,7 @@ for i, entry in enumerate(dataset):
         not author
         or not text
         or author in excluded_authors
-        or avg_views < 5000
+        or avg_views < MIN_VIEWS
         or warnings.intersection({"Sexual Content", "Disturbing Content"})
         or tags.intersection({"Grimdark", "Harem"})
     ):
