@@ -13,11 +13,18 @@ from prepare_clean_story_dataset import SAVE_PATH
 
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "true"
 
-def causal_collator(features):
-    # Remove non-token fields like 'author', 'length'
-    features = [{"input_ids": f["input_ids"]} for f in features]
+def get_last_checkpoint(output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+    checkpoints = [
+        os.path.join(output_dir, d) for d in os.listdir(output_dir)
+        if d.startswith("checkpoint-") and os.path.isdir(os.path.join(output_dir, d))
+    ]
+    if not checkpoints:
+        return None
+    return sorted(checkpoints, key=lambda x: int(x.split("-")[-1]))[-1]
 
-    # Pad and return as input + labels
+def causal_collator(features):
+    features = [{"input_ids": f["input_ids"]} for f in features]
     padded = tokenizer.pad(
         features,
         padding=True,
@@ -26,42 +33,41 @@ def causal_collator(features):
     padded["labels"] = padded["input_ids"].clone()
     return padded
 
-
 def main():
     print("=" * 70)
     print("PYR PRETRAINING Phase 2 - Narrative Fluency")
     print("=" * 70)
 
     DATASET_PATH = SAVE_PATH
-    PHASE1_MODEL_PATH = "./pyr-135m-base-1/checkpoint-128000"
+    PHASE1_DIR = "./pyr-135m-base-1"
     OUTPUT_DIR = "./pyr-135m-base-2"
+    LAST_PHASE1_CHECKPOINT = get_last_checkpoint(PHASE1_DIR)
 
-    EPOCHS = 1
-    MAX_LENGTH = 2048  # Informational only here
+    if not LAST_PHASE1_CHECKPOINT:
+        raise RuntimeError(f"No checkpoint found in {PHASE1_DIR}!")
 
-    print("Loading tokenizer from Phase 1...")
+    print(f"Loading tokenizer from: {LAST_PHASE1_CHECKPOINT}")
     global tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(PHASE1_MODEL_PATH, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(LAST_PHASE1_CHECKPOINT, use_fast=True)
 
-    print("Loading model from Phase 1...")
+    print(f"Loading model from: {LAST_PHASE1_CHECKPOINT}")
     model = LlamaForCausalLM.from_pretrained(
-        PHASE1_MODEL_PATH,
+        LAST_PHASE1_CHECKPOINT,
         torch_dtype=torch.bfloat16,
         device_map="auto"
     )
 
-    print("Model and tokenizer loaded.")
     total_params = sum(p.numel() for p in model.parameters()) / 1e6
     print(f"Model parameters: {total_params:.1f}M")
 
     print(f"\nLoading filtered RoyalRoad dataset from disk: {DATASET_PATH}")
     dataset = load_from_disk(DATASET_PATH)
-
-    print(f"Dataset loaded:")
     print(f"   Train: {len(dataset['train']):,} samples")
     print(f"   Eval:  {len(dataset['test']):,} samples")
     gc.collect()
 
+    EPOCHS = 1
+    MAX_LENGTH = 2048  # Informational only
     batch_size = 4
     grad_accum = 32
     effective_batch_size = batch_size * grad_accum
@@ -76,9 +82,9 @@ def main():
         save_steps=1000,
         eval_strategy="steps",
         eval_steps=1000,
-        learning_rate=2e-5,
+        learning_rate=2e-5,  # very low final LR
         weight_decay=0.01,
-        warmup_steps=1000,
+        warmup_steps=0,
         bf16=True,
         max_grad_norm=1.0,
         logging_dir=f"{OUTPUT_DIR}/logs",
@@ -88,7 +94,7 @@ def main():
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         save_safetensors=True,
-        lr_scheduler_type="cosine",
+        lr_scheduler_type="constant",  # minimal scheduler effect
     )
 
     trainer = Trainer(
@@ -104,7 +110,7 @@ def main():
     print("=" * 70)
 
     try:
-        trainer.train()
+        trainer.train()  # don't resume a phase 2 checkpoint, always fresh
 
         print("\nTRAINING COMPLETE!")
         model.save_pretrained(OUTPUT_DIR)
@@ -118,19 +124,19 @@ def main():
             f.write(f"Training sequence length: {MAX_LENGTH}\n")
             f.write(f"Effective batch size: {effective_batch_size}\n")
             f.write(f"Final eval loss: {trainer.state.log_history[-1].get('eval_loss', 'N/A')}\n")
-            f.write(f"Continued from: {PHASE1_MODEL_PATH}\n")
+            f.write(f"Continued from: {LAST_PHASE1_CHECKPOINT}\n")
 
         print(f"Model saved to: {OUTPUT_DIR}")
 
     except KeyboardInterrupt:
         print("\nTraining interrupted. Saving checkpoint...")
-        model.save_pretrained(f"{OUTPUT_DIR}-interrupted")
+        trainer.save_model(f"{OUTPUT_DIR}-interrupted")
         tokenizer.save_pretrained(f"{OUTPUT_DIR}-interrupted")
         trainer.save_state()
 
     except Exception as e:
         print(f"\nTraining failed: {e}")
-        model.save_pretrained(f"{OUTPUT_DIR}-failed")
+        trainer.save_model(f"{OUTPUT_DIR}-failed")
         tokenizer.save_pretrained(f"{OUTPUT_DIR}-failed")
         trainer.save_state()
         import traceback
