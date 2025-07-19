@@ -66,10 +66,9 @@ def main():
     print(f"   Eval:  {len(dataset['test']):,} samples")
     gc.collect()
 
-    EPOCHS = 1
-    MAX_LENGTH = 2048  # Informational only
-    batch_size = 4
-    grad_accum = 32
+    EPOCHS = 3
+    batch_size = 2
+    grad_accum = 64
     effective_batch_size = batch_size * grad_accum
 
     training_args = TrainingArguments(
@@ -121,7 +120,7 @@ def main():
             f.write(f"Pyr 135m Base - Phase 2 (RoyalRoad filtered)\n")
             f.write(f"Parameters: {total_params:.1f}M\n")
             f.write(f"Training samples: {len(dataset['train']):,}\n")
-            f.write(f"Training sequence length: {MAX_LENGTH}\n")
+            f.write(f"Training sequence length: 8192\n")
             f.write(f"Effective batch size: {effective_batch_size}\n")
             f.write(f"Final eval loss: {trainer.state.log_history[-1].get('eval_loss', 'N/A')}\n")
             f.write(f"Continued from: {LAST_PHASE1_CHECKPOINT}\n")

@@ -2,7 +2,6 @@ import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch, humanize, time
 
-
 def check_quantization_status(model, max_layers=5):
     """Check quantization status of multiple layers"""
     print("\nQuantization Status:")
@@ -42,26 +41,30 @@ def list_checkpoints(path):
 
 
 def main():
-    MODEL_DIR = "./pyr-135m-base-1"
-
-    if not os.path.exists(f"{MODEL_DIR}/config.json"):
-        checkpoints = list_checkpoints(MODEL_DIR)
-        checkpoint_to_use = None
-        step_count = -1
-        for entry in checkpoints:
-            steps = int(entry.split("-")[1])
-            if steps > step_count:
-                checkpoint_to_use = entry
-                step_count = steps
-        if checkpoint_to_use is not None:
-            print(f"Loading checkpoint: {checkpoint_to_use}")
-            MODEL_DIR = f"{MODEL_DIR}/{checkpoint_to_use}"
-        else:
-            print("No checkpoints found.")
-            return
+    phase_paths = ["./pyr-135m-base-4", "./pyr-135m-base-3", "./pyr-135m-base-2", "./pyr-135m-base-1"]
+    for path in phase_paths:
+        if os.path.exists(path):
+            MODEL_DIR = path
+            if not os.path.exists(f"{MODEL_DIR}/config.json"):
+                checkpoints = list_checkpoints(MODEL_DIR)
+                checkpoint_to_use = None
+                step_count = -1
+                for entry in checkpoints:
+                    steps = int(entry.split("-")[1])
+                    if steps > step_count:
+                        checkpoint_to_use = entry
+                        step_count = steps
+                if checkpoint_to_use is not None:
+                    print(f"Model: {MODEL_DIR}")
+                    print(f"Loading checkpoint: {checkpoint_to_use}")
+                    MODEL_DIR = f"{MODEL_DIR}/{checkpoint_to_use}"
+                elif path == "./pyr-135m-base-1":
+                    print("No checkpoints found.")
+                    return
+            break
 
     print("Loading tokenizer and model...")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained("./pyr-16k-tokenizer", use_fast=True)
     model = AutoModelForCausalLM.from_pretrained(MODEL_DIR).to("cuda" if torch.cuda.is_available() else "cpu")
     print(f"model.config.use_cache = {model.config.use_cache}")
     model.eval()
