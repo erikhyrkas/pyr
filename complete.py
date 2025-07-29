@@ -99,7 +99,7 @@ def main():
                     repetition_penalty=1.2,
                     pad_token_id=tokenizer.pad_token_id,
                 )
-            response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+            response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=False)
             end = time.time()
             elapsed = end - start
             print(f"Response: {response}")
