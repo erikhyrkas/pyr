@@ -39,6 +39,8 @@ OPERATORS     = [
 # Decimal digits -------------------------------------------
 DIGITS = list("0123456789")
 
+# I suspect I shouldn't have put OPERATORS + DIGITS here:
+# I've historically made tokenizers from scratch or used pre-rolled tokenizers and didn't remember this would be an issue with decoding later where these tokens would be invisible.
 SPECIAL_TOKENS = CHATML_TOKENS + HOUSE_TOKENS + OPERATORS + DIGITS
 
 # ──────────────────── DATASET ITERATOR ────────────────────
