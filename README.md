@@ -55,7 +55,8 @@ Many use cases require instruction following and speed, but do not require encyc
 - Phase 1 (Cosmopedia-v2, 10B tokens @ 512 seq len)
 - Phase 2 (RoyalRoad-1.61M filtered, 1.3B tokens @ 8192 seq len)
 - Phase 3 (FineWeb-EDU, 20B tokens @ 2048 seq len)
-- Phase 4 (Python-EDU corpus, 14B tokens @ 2048 seq len )
+- Phase 4 (Cosmopedia-v2 filtered to stories > 1000 tokens, 10B tokens @ 2048 seq len)
+- Phase 5 (Python-EDU corpus, 14B tokens @ 2048 seq len )
 
 ### Pyr-instruct-135m
 
