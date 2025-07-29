@@ -22,7 +22,7 @@ def main():
 
     DATASET_SIZE = 7_680_000  # All 7.68M rows from python-edu
     EPOCHS = 1
-    MAX_LENGTH = 1024  # Keep same sequence length as Phase 3
+    MAX_LENGTH = 2048  # Keep same sequence length as Phase 3
 
     # Path to Phase 3 model
     PHASE3_MODEL_PATH = "./pyr-135m-base-3"  # Adjust if your Phase 3 output dir is different
@@ -128,7 +128,7 @@ def main():
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         save_safetensors=True,
-        lr_scheduler_type="cosine",
+        lr_scheduler_type="constant",
         # Additional settings for large dataset
         # dataloader_pin_memory=True, # wait to see if we need this
         # gradient_checkpointing=True,  # Save memory at the cost of speed. wait and see if we need this.

@@ -17,9 +17,9 @@ def main():
     print("PRETRAINING Phase 3")
     print("=" * 70)
 
-    DATASET_SIZE = 10_000_000  # 10M samples = ~10B tokens for length 1024
+    DATASET_SIZE = 10_000_000  # 10M samples = ~10B tokens for length 1024... ~20B for 2048 sequence
     EPOCHS = 1
-    MAX_LENGTH = 1024  # sequence length for phase 3
+    MAX_LENGTH = 2048  # sequence length for phase 3
 
     # Path to Phase 2 model
     PHASE2_MODEL_PATH = "./pyr-135m-base-2"
@@ -107,7 +107,7 @@ def main():
         save_steps=1000,
         eval_strategy="steps",
         eval_steps=1000,
-        learning_rate=5e-5,  # Lower LR for continued training
+        learning_rate=2e-5,
         weight_decay=0.01,
         warmup_steps=250,  # Fewer warmup steps since continuing training
         bf16=True,
@@ -120,7 +120,7 @@ def main():
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         save_safetensors=True,
-        lr_scheduler_type="cosine",  # Cosine decay for phase 3
+        lr_scheduler_type="constant",
     )
 
     data_collator = DataCollatorForLanguageModeling(
